@@ -7538,7 +7538,7 @@ func TestXProtoUnnamedPortalSurvivesSync(t *testing.T) {
 					PreparedStatement: "simple_query_stmt",
 				},
 				&pgproto3.Query{
-					String: "SET statement_timeout = 0",
+					String: "SELECT 1 /* __spqr__execute_on: sh1 */",
 				},
 				&pgproto3.Execute{},
 				&pgproto3.Sync{},
@@ -7552,8 +7552,23 @@ func TestXProtoUnnamedPortalSurvivesSync(t *testing.T) {
 				},
 				&pgproto3.ParseComplete{},
 				&pgproto3.BindComplete{},
+				&pgproto3.RowDescription{
+					Fields: []pgproto3.FieldDescription{
+						{
+							Name:         []byte("?column?"),
+							DataTypeOID:  23,
+							DataTypeSize: 4,
+							TypeModifier: -1,
+						},
+					},
+				},
+				&pgproto3.DataRow{
+					Values: [][]byte{
+						[]byte("1"),
+					},
+				},
 				&pgproto3.CommandComplete{
-					CommandTag: []byte("SET"),
+					CommandTag: []byte("SELECT 1"),
 				},
 				&pgproto3.ReadyForQuery{
 					TxStatus: 'T',
