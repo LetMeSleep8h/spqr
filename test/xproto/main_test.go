@@ -31,8 +31,12 @@ func thisIsSPQRSpecificTest(t *testing.T) {
 	}
 }
 
-func protoTestRunner(t *testing.T, frontend *pgproto3.Frontend, tt []MessageGroup) {
-	for i := 0; i < 5; i++ {
+func protoTestRunner(t *testing.T, frontend *pgproto3.Frontend, tt []MessageGroup, repeats ...int) {
+	repeatCount := 5
+	if len(repeats) > 0 {
+		repeatCount = repeats[0]
+	}
+	for i := 0; i < repeatCount; i++ {
 		for _, msgroup := range tt {
 			for _, msg := range msgroup.Request {
 				frontend.Send(msg)

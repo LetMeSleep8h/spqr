@@ -7523,54 +7523,48 @@ func TestXProtoUnnamedPortalSurvivesSync(t *testing.T) {
 		},
 	})
 
-	if !assert.NoError(t, conn.SetDeadline(time.Now().Add(10*time.Second))) {
-		return
-	}
-	frontend.Send(&pgproto3.Query{
-		String: "BEGIN",
-	})
-	frontend.Send(&pgproto3.Parse{
-		Name:  "simple_query_stmt",
-		Query: "SELECT 1 /* __spqr__execute_on: sh1 */",
-	})
-	frontend.Send(&pgproto3.Bind{
-		PreparedStatement: "simple_query_stmt",
-	})
-	frontend.Send(&pgproto3.Query{
-		String: "SET statement_timeout = 0",
-	})
-	frontend.Send(&pgproto3.Execute{})
-	frontend.Send(&pgproto3.Sync{})
-	if !assert.NoError(t, frontend.Flush()) {
-		return
-	}
-	for _, expected := range []pgproto3.BackendMessage{
-		&pgproto3.CommandComplete{
-			CommandTag: []byte("BEGIN"),
+	protoTestRunner(t, frontend, []MessageGroup{
+		{
+			CheckCodeOnly: true,
+			Request: []pgproto3.FrontendMessage{
+				&pgproto3.Query{
+					String: "BEGIN",
+				},
+				&pgproto3.Parse{
+					Name:  "simple_query_stmt",
+					Query: "SELECT 1 /* __spqr__execute_on: sh1 */",
+				},
+				&pgproto3.Bind{
+					PreparedStatement: "simple_query_stmt",
+				},
+				&pgproto3.Query{
+					String: "SET statement_timeout = 0",
+				},
+				&pgproto3.Execute{},
+				&pgproto3.Sync{},
+			},
+			Response: []pgproto3.BackendMessage{
+				&pgproto3.CommandComplete{
+					CommandTag: []byte("BEGIN"),
+				},
+				&pgproto3.ReadyForQuery{
+					TxStatus: 'T',
+				},
+				&pgproto3.ParseComplete{},
+				&pgproto3.BindComplete{},
+				&pgproto3.CommandComplete{
+					CommandTag: []byte("SET"),
+				},
+				&pgproto3.ReadyForQuery{
+					TxStatus: 'T',
+				},
+				&pgproto3.ErrorResponse{
+					Severity: "ERROR",
+					Code:     "34000",
+				},
+			},
 		},
-		&pgproto3.ReadyForQuery{
-			TxStatus: 'T',
-		},
-		&pgproto3.ParseComplete{},
-		&pgproto3.BindComplete{},
-		&pgproto3.CommandComplete{
-			CommandTag: []byte("SET"),
-		},
-		&pgproto3.ReadyForQuery{
-			TxStatus: 'T',
-		},
-	} {
-		msg, err := frontend.Receive()
-		if !assert.NoError(t, err) || !assert.Equal(t, expected, msg) {
-			return
-		}
-	}
-
-	msg, err := frontend.Receive()
-	if !assert.NoError(t, err) || !assert.IsType(t, &pgproto3.ErrorResponse{}, msg) {
-		return
-	}
-	assert.Equal(t, "34000", msg.(*pgproto3.ErrorResponse).Code)
+	}, 1)
 }
 
 func TestXProtoClosedUnnamedPortalStaysClosedAfterSync(t *testing.T) {
@@ -7581,49 +7575,43 @@ func TestXProtoClosedUnnamedPortalStaysClosedAfterSync(t *testing.T) {
 	defer func() {
 		_ = conn.Close()
 	}()
-	if !assert.NoError(t, conn.SetDeadline(time.Now().Add(10*time.Second))) {
-		return
-	}
 
-	frontend.Send(&pgproto3.Query{
-		String: "BEGIN",
-	})
-	frontend.Send(&pgproto3.Parse{
-		Query: "SELECT 1 /* __spqr__execute_on: sh1 */",
-	})
-	frontend.Send(&pgproto3.Bind{})
-	frontend.Send(&pgproto3.Close{
-		ObjectType: 'P',
-	})
-	frontend.Send(&pgproto3.Sync{})
-	frontend.Send(&pgproto3.Execute{})
-	frontend.Send(&pgproto3.Sync{})
-	if !assert.NoError(t, frontend.Flush()) {
-		return
-	}
-	for _, expected := range []pgproto3.BackendMessage{
-		&pgproto3.CommandComplete{
-			CommandTag: []byte("BEGIN"),
+	protoTestRunner(t, frontend, []MessageGroup{
+		{
+			CheckCodeOnly: true,
+			Request: []pgproto3.FrontendMessage{
+				&pgproto3.Query{
+					String: "BEGIN",
+				},
+				&pgproto3.Parse{
+					Query: "SELECT 1 /* __spqr__execute_on: sh1 */",
+				},
+				&pgproto3.Bind{},
+				&pgproto3.Close{
+					ObjectType: 'P',
+				},
+				&pgproto3.Sync{},
+				&pgproto3.Execute{},
+				&pgproto3.Sync{},
+			},
+			Response: []pgproto3.BackendMessage{
+				&pgproto3.CommandComplete{
+					CommandTag: []byte("BEGIN"),
+				},
+				&pgproto3.ReadyForQuery{
+					TxStatus: 'T',
+				},
+				&pgproto3.ParseComplete{},
+				&pgproto3.BindComplete{},
+				&pgproto3.CloseComplete{},
+				&pgproto3.ReadyForQuery{
+					TxStatus: 'T',
+				},
+				&pgproto3.ErrorResponse{
+					Severity: "ERROR",
+					Code:     "34000",
+				},
+			},
 		},
-		&pgproto3.ReadyForQuery{
-			TxStatus: 'T',
-		},
-		&pgproto3.ParseComplete{},
-		&pgproto3.BindComplete{},
-		&pgproto3.CloseComplete{},
-		&pgproto3.ReadyForQuery{
-			TxStatus: 'T',
-		},
-	} {
-		msg, err := frontend.Receive()
-		if !assert.NoError(t, err) || !assert.Equal(t, expected, msg) {
-			return
-		}
-	}
-
-	msg, err := frontend.Receive()
-	if !assert.NoError(t, err) || !assert.IsType(t, &pgproto3.ErrorResponse{}, msg) {
-		return
-	}
-	assert.Equal(t, "34000", msg.(*pgproto3.ErrorResponse).Code)
+	}, 1)
 }
